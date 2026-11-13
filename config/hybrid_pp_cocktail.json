@@ -1,0 +1,26 @@
+{
+  "generators": [
+    {
+      "name": "pythia8pp"
+    },
+    {
+      "cocktail": [
+        {
+          "name": "pythia8pp"
+        },
+        {
+          "name": "boxgen",
+          "config": {
+            "pdg": 4122,
+            "number": 5,
+            "eta": [-0.8, 0.8],
+            "prange": [1.0, 10.0],
+            "phirange": [0.0, 360.0],
+            "sampleYAndPt": false
+          }
+        }
+      ]
+    }
+  ],
+  "fractions": [1, 1]
+}

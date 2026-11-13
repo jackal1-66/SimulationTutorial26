@@ -1,0 +1,75 @@
+#!/bin/bash
+# o2token - create an AliEn token in a SWAN session.
+# Run it in a SWAN terminal:
+#     bash <project>/o2token
+#
+# - The certificate is read from ~/.globus (CERNBox).
+# - If the private key is password protected, the password is asked once and the key
+#   is decrypted into a private file in /tmp/$USER/globus (permissions 400).
+#   The decrypted key is DELETED as soon as the token has been created (also on errors):
+#   afterwards only the token is used.
+# - The token is written to /tmp/tokencert_<uid>.pem / tokenkey_<uid>.pem, where the
+#   notebooks (through o2exec) find it. It is lost when the SWAN session ends.
+
+here=$(dirname "$(readlink -f "$0")")
+user=${USER:-$(id -un)}
+g=/tmp/$user/globus
+cert_src=$HOME/.globus/usercert.pem
+key_src=$HOME/.globus/userkey.pem
+
+for f in "$cert_src" "$key_src"; do
+  if [ ! -r "$f" ]; then
+    echo "o2token: $f not found - copy your grid certificate to CERNBox ~/.globus/" >&2
+    exit 1
+  fi
+done
+
+# openssl from the system, or from the O2 environment as a fallback
+if command -v openssl > /dev/null; then
+  OPENSSL=(openssl)
+else
+  OPENSSL=(bash "$here/o2exec" openssl)
+fi
+
+umask 077
+mkdir -p "$g" && chmod 700 "$g"
+rm -f "$g/usercert.pem" "$g/userkey.pem"
+trap 'rm -f "$g/userkey.pem"' EXIT INT TERM
+
+cp "$cert_src" "$g/usercert.pem"
+chmod 644 "$g/usercert.pem"
+
+echo "Certificate: $cert_src"
+"${OPENSSL[@]}" x509 -in "$g/usercert.pem" -noout -subject -enddate || exit 1
+echo
+
+if grep -qE 'ENCRYPTED|Proc-Type: 4,ENCRYPTED' "$key_src"; then
+  # password-protected key: decrypt it (password passed on a file descriptor, never on the command line)
+  read -r -s -p "Grid certificate password: " pw < /dev/tty
+  echo
+  if ! "${OPENSSL[@]}" pkey -in "$key_src" -passin fd:3 -out "$g/userkey.pem" 3<<< "$pw" 2> "$g/openssl.err"; then
+    unset pw
+    echo "o2token: could not decrypt $key_src - wrong password?" >&2
+    cat "$g/openssl.err" >&2
+    rm -f "$g/openssl.err"
+    exit 1
+  fi
+  unset pw
+  rm -f "$g/openssl.err"
+else
+  cp "$key_src" "$g/userkey.pem"
+fi
+chmod 400 "$g/userkey.pem"
+
+export X509_USER_CERT=$g/usercert.pem
+export X509_USER_KEY=$g/userkey.pem
+
+bash "$here/o2exec" alien-token-init "$@" < /dev/null
+rc=$?
+rm -f "$g/userkey.pem"   # the token is all we need from now on
+echo
+if [ $rc -ne 0 ]; then
+  echo "o2token: alien-token-init failed (exit code $rc). For details run: ALIENPY_DEBUG=1 bash $0 ; then read ~/alien_py.log" >&2
+  exit $rc
+fi
+bash "$here/o2exec" alien-token-info

@@ -1,0 +1,98 @@
+#!/bin/bash
+# o2exec - run a command inside the ALICE O2sim environment from CVMFS.
+#
+# The command runs in a CLEAN environment (env -i), isolated from the SWAN/LCG
+# software stack of the notebook kernel (different ROOT/Python versions).
+#
+# Usage:   o2exec <command> [args...]
+#          o2exec bash -c 'cmd1 && cmd2'
+# Tag:     export O2SIM_TAG=VO_ALICE@O2sim::vYYYYMMDD-1   (default below)
+
+O2SIM_TAG=${O2SIM_TAG:-VO_ALICE@O2sim::v20261112-1}
+ALIENV=/cvmfs/alice.cern.ch/bin/alienv
+
+if [ ! -x "$ALIENV" ]; then
+  echo "o2exec: $ALIENV not found - is /cvmfs/alice.cern.ch mounted in this session?" >&2
+  exit 127
+fi
+if [ $# -eq 0 ]; then
+  echo "usage: o2exec <command> [args...]" >&2
+  exit 2
+fi
+
+# O2DPG asks DPL for a 50 GB shared-memory segment (\${SHMSIZE:-50000000000}).
+# Containers have a much smaller /dev/shm: use 3/4 of it unless SHMSIZE is set.
+if [ -z "$SHMSIZE" ]; then
+  avail=$(df -B1 --output=size /dev/shm 2>/dev/null | tail -1 | tr -d ' ')
+  if [ -n "$avail" ] && [ "$avail" -lt 50000000000 ]; then
+    SHMSIZE=$((avail * 3 / 4))
+  fi
+fi
+
+user=${USER:-$(id -un)}
+# TMPDIR is pinned to /tmp: the AliEn token is stored in $TMPDIR/tokencert_<uid>.pem,
+# and the SWAN terminal and the notebook kernels may have different TMPDIR values.
+keep=(HOME="$HOME" USER="$user" LOGNAME="$user" LANG=C.UTF-8 TERM=dumb
+      PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp)
+for v in SHMSIZE SIMTUT_DIR SIMTUT_PROJECT O2SIM_TAG X509_USER_CERT X509_USER_KEY \
+         JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIENPY_DEBUG ALIENPY_DEBUG_FILE \
+         ALIEN_O2DPG_WORKFLOW_RUNNER ALICEO2_CCDB_LOCALCACHE; do
+  [ -n "${!v}" ] && keep+=("$v=${!v}")
+done
+# Credentials of the SWAN session for EOS/CERNBox access (Kerberos, OAuth, EOS/XRootD)
+while IFS='=' read -r v _; do
+  keep+=("$v=${!v}")
+done < <(env | grep -E '^(KRB5[A-Z_]*|OAUTH[A-Z0-9_]*|EOS[A-Z_]*|XrdSec[A-Za-z_]*)=')
+# Tutorial variables set by the notebooks (exercise directories, project paths)
+while IFS='=' read -r v _; do
+  keep+=("$v=${!v}")
+done < <(env | grep -E '^(EX[0-9]+|SIMTUT_[A-Z_]*)=')
+
+# directory of this script (gnutime.py lives next to it)
+O2EXEC_DIR=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+# where the O2_ROOT overlay (see below) is built
+O2EXEC_OVERLAY_BASE=${SIMTUT_DIR:-/tmp/$user/o2exec}/.o2root-overlay
+
+# Load the environment silently (alienv prints the module list on stderr);
+# set O2EXEC_VERBOSE=1 to see it. Errors are always shown.
+exec env -i "${keep[@]}" ALIENV="$ALIENV" O2SIM_TAG="$O2SIM_TAG" O2EXEC_VERBOSE="$O2EXEC_VERBOSE" \
+  O2EXEC_DIR="$O2EXEC_DIR" O2EXEC_OVERLAY_BASE="$O2EXEC_OVERLAY_BASE" bash -c '
+  errf=$(mktemp)
+  envscript=$("$ALIENV" printenv "$O2SIM_TAG" 2>"$errf")
+  rc=$?
+  if [ $rc -ne 0 ] || [ -z "$envscript" ] || grep -q "ERROR" "$errf"; then
+    echo "o2exec: could not load $O2SIM_TAG" >&2; cat "$errf" >&2; rm -f "$errf"; exit 1
+  fi
+  [ -n "$O2EXEC_VERBOSE" ] && cat "$errf" >&2
+  rm -f "$errf"
+  eval "$envscript"
+
+  # O2 runs every O2DPG workflow task through ${O2_ROOT}/share/scripts/jobutils2.sh, which
+  # hardcodes /usr/bin/time (GNU time). Where it is missing (e.g. SWAN), every task fails with
+  # "... had nonzero exit code". Then O2_ROOT is pointed to an overlay: symlinks to the real
+  # O2 installation, except for a jobutils2.sh that uses gnutime.py instead of /usr/bin/time.
+  if [ ! -x /usr/bin/time ] && [ -f "$O2_ROOT/share/scripts/jobutils2.sh" ] && [ -f "$O2EXEC_DIR/gnutime.py" ]; then
+    real=$O2_ROOT
+    ov=$O2EXEC_OVERLAY_BASE/$(basename "$real")
+    if [ ! -f "$ov/.ready" ]; then
+      tmp=$ov.tmp.$$
+      rm -rf "$tmp"; mkdir -p "$tmp/share/scripts"
+      for e in "$real"/* "$real"/.[!.]*; do
+        [ -e "$e" ] || continue; n=${e##*/}; [ "$n" = share ] || ln -s "$e" "$tmp/$n"
+      done
+      for e in "$real"/share/*; do
+        n=${e##*/}; [ "$n" = scripts ] || ln -s "$e" "$tmp/share/$n"
+      done
+      for e in "$real"/share/scripts/*; do
+        n=${e##*/}; [ "$n" = jobutils2.sh ] || ln -s "$e" "$tmp/share/scripts/$n"
+      done
+      cp "$O2EXEC_DIR/gnutime.py" "$tmp/share/scripts/gnutime.py"
+      sed "s#/usr/bin/time #$(command -v python3) $ov/share/scripts/gnutime.py #" \
+        "$real/share/scripts/jobutils2.sh" > "$tmp/share/scripts/jobutils2.sh"
+      touch "$tmp/.ready"
+      mv -T "$tmp" "$ov" 2>/dev/null || rm -rf "$tmp"   # another o2exec may have been faster
+    fi
+    [ -f "$ov/.ready" ] && export O2_ROOT=$ov
+  fi
+  unset ALIENV O2EXEC_VERBOSE O2EXEC_DIR O2EXEC_OVERLAY_BASE
+  exec "$@"' o2exec "$@"

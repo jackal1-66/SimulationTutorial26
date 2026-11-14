@@ -10,6 +10,8 @@ Everything runs in a [SWAN](https://swan.cern.ch) session: participants need onl
 | `02_hybrid_workflow.ipynb` | Exercise 2 — O2DPG workflow up to the AOD with the hybrid generator (plain + cocktail in one JSON) |
 | `03_anchored_external.ipynb` | Exercise 3 — anchored MC (LHC23f run 535069) with the PWGHF gap-triggered external generator, optional GRID submission |
 
+> **Not using SWAN?** The same exercises run from a terminal on **lxplus** (O2 from CVMFS) or on your own machine (local `aliBuild` of O2sim): see [`standalone/README.md`](standalone/README.md).
+
 ### 1. Start a SWAN session
 
 Go to <https://swan.cern.ch> and choose:

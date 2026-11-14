@@ -16,7 +16,7 @@ Go to <https://swan.cern.ch> and choose:
 
 | Setting | Value |
 |---|---|
-| Software stack | the latest default LCG release |
+| Software stack | the latest default LCG release (110 recommended currently)|
 | Platform | AlmaLinux 9 |
 | Number of cores | **4** |
 | Memory | **16 GB** |

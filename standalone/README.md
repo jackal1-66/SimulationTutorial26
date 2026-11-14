@@ -27,7 +27,7 @@ cd SimulationTutorial26
 ### A. lxplus (CVMFS)
 
 ```bash
-ssh <user>@lxplus9.cern.ch
+ssh <user>@lxplus.cern.ch
 /cvmfs/alice.cern.ch/bin/alienv enter VO_ALICE@O2PDPSuite::MC-prod-2026-v14-1
 ```
 
@@ -47,7 +47,7 @@ mkdir -p ~/alice && cd ~/alice
 aliBuild init O2sim@dev --defaults o2           # clones alidist
 cd alidist && git checkout <tag>  ; cd ..       # optional: a tagged alidist, e.g. the one of the release you want
 aliDoctor O2sim --defaults o2                   # checks and lists the system packages you are missing
-aliBuild build O2sim --defaults o2 -j <ncores>  # hours
+aliBuild build O2sim --defaults o2 -j <ncores>  # hours. You can "--disable O2Physics" if not needed 
 ```
 
 `aliDoctor` tells you which system packages to install. The `O2sim` package contains O2, O2DPG and the event generators; `O2PDPSuite` is the same plus more packages and works too.
@@ -56,7 +56,7 @@ Load it:
 
 ```bash
 cd ~/alice
-alienv -w ~/alice/sw enter O2sim/latest         # "latest" or a specific version, see: alienv -w ~/alice/sw q | grep O2sim
+alienv -w ~/alice/sw enter O2sim/latest  # "latest" or a specific version, see: alienv -w ~/alice/sw q | grep O2sim
 ```
 
 > If your shell defines an `alienv` function (from `alienv shell-helper`) and `alienv enter` does not behave, call the script directly: `~/.local/bin/alienv -w ~/alice/sw enter O2sim/latest`.
@@ -139,7 +139,7 @@ cd $EX1
 root -l -b -q "$SIMTUT_PROJECT/macros/kineOverview.C(\"o2sim_Kine.root\",\"kine_pythia.svg\")"
 ```
 
-View `kine_pythia.svg` with a browser or `display`. On lxplus copy it to your laptop: `scp <user>@lxplus9.cern.ch:/tmp/<user>/simtutorial/ex1/kine_pythia.svg .`
+View `kine_pythia.svg` with a browser or `display`. On lxplus copy it to your laptop: `scp <user>@lxplus.cern.ch:/tmp/<user>/simtutorial/ex1/kine_pythia.svg .`
 
 ### 1c. Make it faster
 
@@ -157,9 +157,9 @@ ls -lh *_Kine.root
 
 > Predefined detector sets can be chosen with `--detectorList`: `ALICE2` (Run 3), `ALICE2.1` (Run 4), `ALICE3` (Run 5/6).
 
-### 1d. A box generator: Λc⁺ gun
+### 1d. A box generator: $Λ_c^⁺$ gun
 
-`boxgen` shoots `BoxGun.number` particles of type `BoxGun.pdg`, uniform in η, p and φ. Here 5 Λc⁺ (PDG 4122) per event, |η| < 0.8, 1 < p < 10 GeV/c.
+`boxgen` shoots `BoxGun.number` particles of type `BoxGun.pdg`, uniform in η, p and φ. Here 5 $Λ_c^⁺$ (PDG 4122) per event, |η| < 0.8, 1 < p < 10 GeV/c.
 
 ```bash
 cd $EX1
@@ -171,7 +171,7 @@ root -l -b -q "$SIMTUT_PROJECT/macros/kineDaughters.C(\"lambdac_Kine.root\",4122
 ```
 
 **Questions**
-1. Which decay products of the Λc⁺ do you find, and in which proportions? Is this what you expect from the PDG? Who decays the Λc⁺ here, the generator or the transport code, and with which decay table? (For physics samples, PWG configurations set the Λc⁺ decays at generator level.)
+1. Which decay products of the $Λ_c^⁺$ do you find, and in which proportions? Is this what you expect from the PDG? Who decays the $Λ_c^⁺$ here, the generator or the transport code, and with which decay table? (For physics samples, PWG configurations set the $Λ_c^⁺$ decays at generator level.)
 2. Change the gun to π⁺ (`BoxGun.pdg=211`) and compare the number of tracks per event, i.e. the secondaries produced in the material.
 
 > Boxgen can also sample uniformly in pT and rapidity: add `BoxGun.sampleYAndPt=true`, and `eta`/`prange` are then read as y and pT ranges.
@@ -182,7 +182,7 @@ root -l -b -q "$SIMTUT_PROJECT/macros/kineDaughters.C(\"lambdac_Kine.root\",4122
 
 The **hybrid generator** combines several generators configured in one JSON file. `config/hybrid_pp_cocktail.json` defines two entries used alternately:
 1. plain `pythia8pp` (no cocktail);
-2. a **cocktail** of `pythia8pp` + `boxgen` injecting 5 Λc⁺ into the same event.
+2. a **cocktail** of `pythia8pp` + `boxgen` injecting 5 $Λ_c^⁺$ into the same event.
 
 With `"fractions": [1, 1]`: one plain event, then one cocktail event, and so on. Then you run the full MC chain up to the AOD with two O2DPG steps:
 1. `o2dpg_sim_workflow.py` creates `workflow.json` (a graph of tasks);
@@ -275,8 +275,8 @@ root -l -b -q "$SIMTUT_PROJECT/macros/aodMcSummary.C(\"AO2D.root\",4122)"
 
 **Questions**
 1. The hybrid generator stores which entry of the JSON produced each event as the `subGeneratorId` of the MC collision. Which ID is the plain `pythia8pp` and which is the cocktail?
-2. How many Λc⁺ per collision does each ID have? Can you tell the 5 injected Λc⁺ apart from the natural Pythia8 production? (In an analysis: `mcCollision.getSubGeneratorId()`.)
-3. Change `"fractions"` to `[3, 1]` and rerun from the generation step (`--rerun-from sgngen`). How does the Λc⁺ yield change?
+2. How many $Λ_c^⁺$ per collision does each ID have? Can you tell the 5 injected $Λ_c^⁺$ apart from the natural Pythia8 production? (In an analysis: `mcCollision.getSubGeneratorId()`.)
+3. Change `"fractions"` to `[3, 1]` and rerun from the generation step (`--rerun-from sgngen`). How does the $Λ_c^⁺$ yield change?
 
 ---
 
@@ -336,7 +336,7 @@ cd $EX3
 root -l -b -q "$SIMTUT_PROJECT/macros/aodMcSummary.C(\"AO2D.root\",421)"
 ```
 
-How many MC collisions are **gap** events (`subGeneratorId` 0), and how many are **cc̄- (4) or bb̄-triggered (5)**? Is about 1 in 3 events triggered? Compare the number of D⁰ per collision in the gap and in the triggered events. Try other species: D⁺ 411, Λc⁺ 4122, B⁺ 521. With ~6 events per job, some species may not appear at all.
+How many MC collisions are **gap** events (`subGeneratorId` 0), and how many are **cc̄- (4) or bb̄-triggered (5)**? Is about 1 in 3 events triggered? Compare the number of D⁰ per collision in the gap and in the triggered events. Try other species: D⁺ 411, $Λ_c^⁺$ 4122, B⁺ 521. With ~6 events per job, some species may not appear at all.
 
 ### 3e. (Optional) Submit the same script to the GRID
 

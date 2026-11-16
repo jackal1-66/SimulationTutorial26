@@ -1,7 +1,8 @@
 # ALICE Run 3 simulation hands-on on SWAN
 
 A SWAN project for the simulation hands-on of the ALICE Analysis tutorial (November 2026).
-Everything runs in a [SWAN](https://swan.cern.ch) session: participants need only a browser, a CERN account and an ALICE grid certificate.
+Everything runs in a [SWAN](https://swan.cern.ch) session: participants need only a browser, a CERN account and an ALICE grid certificate. Check out the
+GetReadyForTheHandsOn.pdf before running the tutorial and if you have any doubts about the requirements.
 
 | Notebook | Content |
 |---|---|
